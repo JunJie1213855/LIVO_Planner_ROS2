@@ -1,0 +1,26 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>local_sensing_node</name>
+  <version>0.1.0</version>
+  <description>The local_sensing package (CPU point cloud renderer)</description>
+  <author>Fanze Kong</author>
+  <maintainer email="jackykongfz@gmail.com">Fanze Kong</maintainer>
+  <license>GPLv3</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <depend>rclcpp</depend>
+  <depend>sensor_msgs</depend>
+  <depend>geometry_msgs</depend>
+  <depend>nav_msgs</depend>
+  <depend>cv_bridge</depend>
+  <depend>pcl_ros</depend>
+  <depend>pcl_conversions</depend>
+  <depend>tf2_ros</depend>
+  <depend>ament_index_cpp</depend>
+  <depend>eigen</depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>
