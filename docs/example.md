@@ -17,6 +17,8 @@ source /opt/ros/humble/setup.bash
 colcon build
 ```
 
+完整编译参考 ("compile")[scan_planner_compiled.md].
+
 ### 1.2 只编核心规划器（不含仿真器）
 ```bash
 cd /home/ros/rosws/planner_ws
@@ -38,7 +40,7 @@ colcon build
 
 ## 2. 启动仿真示例（MARSIM 迷宫）
 
-**终端 1** —— 启动整套仿真 + 规划器：
+**终端 1** —— 一条命令启动整套仿真 + 规划器 + RViz2：
 ```bash
 cd /home/ros/rosws/planner_ws
 source /opt/ros/humble/setup.bash
@@ -46,13 +48,14 @@ source install/setup.bash
 ros2 launch scan_planner run.launch.py
 ```
 
-会启动 8 个节点：
+会启动 8 个仿真/规划节点，并**自动开启 RViz2**（加载 `example.rviz`，详见 §3；加 `rviz:=false` 可关闭）：
 - `scan_planner_node` —— 规划器主节点（前端 A* + 后端 B 样条优化 + FSM）
 - `mockamap_node` —— 程序化生成迷宫地图 → `/map_generator/global_cloud`
 - `pcl_render_node` —— 从地图 + 机器人位姿渲染传感器点云 → `/pcl_render_node/cloud`
 - `go2_kinematic_sim` —— 运动学机器人（收 `/cmd_vel`，发里程计 `/quad_0/body_pose`）
 - `closed_loop_controller` —— 轨迹跟踪，发 `/cmd_vel`
 - `go2_gait_publisher` / `odom_visualization` / `go2_robot_state_publisher` —— 步态/可视化/URDF
+- `rviz2` —— 可视化（自动加载 `example.rviz`，Fixed Frame=`world`，显示项已就位）
 
 ### 常用 launch 参数（`参数:=值`）
 | 参数 | 默认 | 说明 |
@@ -66,6 +69,7 @@ ros2 launch scan_planner run.launch.py
 | `init_x`/`init_y`/`init_z` | `-19` / `1` / `0.3` | 机器人初始位姿 |
 | `map_size_x/y/z` | `40` / `40` / `5` | 地图尺寸 (m)，大致范围 x,y ∈ [-20, 20] |
 | `use_gpu` | `false` | GPU 渲染（`opengl_render_node` 未迁移，保持 `false`） |
+| `rviz` | `true` | 是否随启动自动开启 RViz2 并加载 `example.rviz` |
 
 例：
 ```bash
@@ -76,13 +80,13 @@ ros2 launch scan_planner run.launch.py max_vel:=1.0 init_x:=-15.0
 
 ## 3. 可视化（RViz2）
 
-仓库已提供预配置好全部显示项的 rviz2 配置：**`src/SCAN-Planner/rviz/example.rviz`**，直接加载即可，**无需手动 Add**。
+**`run.launch.py` 默认会自动启动 RViz2 并加载**预配置好全部显示项的 `example.rviz`（源文件在 `src/SCAN-Planner/rviz/`，编译后装到包的 share 目录）——**无需再开终端、无需手动 Add**。启动时加 `rviz:=false` 可关闭。
 
-**终端 2**：
+如需单独/手动启动（例如用了 `rviz:=false`，或想开第二个 RViz）：
 ```bash
 source /opt/ros/humble/setup.bash
 source /home/ros/rosws/planner_ws/install/setup.bash
-rviz2 -d /home/ros/rosws/planner_ws/src/SCAN-Planner/rviz/example.rviz
+rviz2 -d $(ros2 pkg prefix scan_planner)/share/scan_planner/rviz/example.rviz
 ```
 
 该配置已包含（Fixed Frame = `world`）：
@@ -133,7 +137,7 @@ ros2 topic pub -1 /move_base_simple/goal geometry_msgs/msg/PoseStamped \
 ## 5. 检查运行状态
 ```bash
 source /opt/ros/humble/setup.bash && source /home/ros/rosws/planner_ws/install/setup.bash
-ros2 node list                            # 应有 8 个仿真/规划节点
+ros2 node list                            # 8 个仿真/规划节点 + rviz2
 ros2 topic hz /pcl_render_node/cloud      # ~10 Hz  → 传感器渲染正常
 ros2 topic hz /quad_0/body_pose           # ~100 Hz → 里程计正常
 ros2 topic hz /cmd_vel                    # 发目标后有输出 → 控制器在驱动
@@ -156,4 +160,26 @@ ros2 launch scan_planner run.launch.py is_real_world:=true
 
 ---
 
-相关文档：`docs/compilereq.md`（依赖/系统环境）、`docs/ros2_migration_guide.md`（ROS1→ROS2 迁移说明）、`docs/scan_sim.png`（仿真截图）、`src/SCAN-Planner/rviz/example.rviz`（RViz2 预配置）。
+## 8. 常见问题 / 排查
+
+### 占用地图（occupancy）在 RViz 里导航后消失
+- **现象**：初始化时能看到 `/grid_map/occupancy_inflate` 局部占用地图，机器人导航一会儿后地图从 RViz 消失（但用 `ros2 topic echo` 看话题其实仍在持续发布点云）。
+- **根因**：`plan_env/grid_map.cpp` 的 `publishMap` / `publishMapInflate` / `publishUnknown` 发布点云时**未设置 `header.stamp`**（`pcl::toROSMsg` 拷来的 PCL 时间戳恒为 0）。当 ROS 域内存在 gazebo 等发布的 `/clock`、RViz 的 TF 缓冲区推进到真实时间后，其 tf2 MessageFilter 会把时间戳为 0 的点云判为“过旧”而丢弃 → 于是初始化能显示、跑一会儿就消失。（`publishDepthCloud` / `publishSlidingMapFrame` / `publishSlidingMapBBox` 迁移时已有戳，唯独这三个漏了。）
+- **修复（已修复）**：三处发布前补 `cloud_msg.header.stamp = node_->now();`，重编 `plan_env` + `scan_planner`（静态库需重链）。占用地图现在导航全程持续显示。验证：
+  ```bash
+  # 时间戳应为真实时间（非 sec: 0）
+  ros2 topic echo --once --no-arr /grid_map/occupancy_inflate | grep -A3 stamp
+  ```
+
+### 规划日志出现 `a star error, force return!`
+规划器在个别 replan 子过程中 A* 未找到路径时的正常回退提示，会继续 replan 并到达目标，不影响整体导航。
+
+### 发了目标机器人不动 / RViz 点选无反应
+见 §4.1：RViz 的 “2D Goal Pose” 默认发布到 `/goal_pose`，而本项目订阅 `/move_base_simple/goal`。用本仓库的 `example.rviz` 已预设正确话题；否则改工具话题或改用命令行方法 A。
+
+### 完整 `colcon build` 里 4 个仿真包报错（历史）
+若看到 `pose_utils` / `mockamap` 等报 `catkin` 相关错误，说明用的是**未迁移**的旧代码；当前仓库这些包均已迁移到 ament_cmake，正常 `colcon build` 应 0 失败（14 个包，含相邻 `ego_planner`）。
+
+---
+
+相关文档：`docs/scan_planner_compiled.md`（ROS 2 编译文档 / 依赖 / 环境）、`docs/ros2_migration_guide.md`（ROS1→ROS2 迁移说明）、`docs/scan_sim.png`（仿真截图）、`src/SCAN-Planner/rviz/example.rviz`（RViz2 预配置）。

@@ -966,6 +966,7 @@ void GridMap::publishMap()
   sensor_msgs::msg::PointCloud2 cloud_msg;
 
   pcl::toROSMsg(cloud, cloud_msg);
+  cloud_msg.header.stamp = node_->now();
   map_pub_->publish(cloud_msg);
 }
 
@@ -1007,6 +1008,7 @@ void GridMap::publishMapInflate(bool all_info)
   sensor_msgs::msg::PointCloud2 cloud_msg;
 
   pcl::toROSMsg(cloud, cloud_msg);
+  cloud_msg.header.stamp = node_->now();
   map_inf_pub_->publish(cloud_msg);
 
   // ROS_INFO("pub map");
@@ -1123,6 +1125,7 @@ void GridMap::publishUnknown()
 
   sensor_msgs::msg::PointCloud2 cloud_msg;
   pcl::toROSMsg(cloud, cloud_msg);
+  cloud_msg.header.stamp = node_->now();
   unknown_pub_->publish(cloud_msg);
 }
 

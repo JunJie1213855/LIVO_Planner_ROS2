@@ -92,4 +92,11 @@ install(DIRECTORY launch
   OPTIONAL
 )
 
+# RViz2 example config lives at the repo root (SCAN-Planner/rviz/); install it
+# into the package share so launch files can find it via FindPackageShare.
+install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/../../../rviz/example.rviz
+  DESTINATION share/${PROJECT_NAME}/rviz
+  OPTIONAL
+)
+
 ament_package()

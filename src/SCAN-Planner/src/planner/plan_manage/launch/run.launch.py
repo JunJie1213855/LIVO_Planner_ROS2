@@ -233,6 +233,19 @@ def launch_setup(context, *args, **kwargs):
             }.items(),
         ))
 
+    # --- RViz2 with the pre-configured example view (toggle with rviz:=false) ---
+    if LaunchConfiguration('rviz').perform(context).lower() in ('true', '1'):
+        rviz_config = os.path.join(
+            get_package_share_directory('scan_planner'), 'rviz', 'example.rviz')
+        if os.path.exists(rviz_config):
+            actions.append(Node(
+                package='rviz2',
+                executable='rviz2',
+                name='rviz2',
+                arguments=['-d', rviz_config],
+                output='screen',
+            ))
+
     return actions
 
 
@@ -256,6 +269,9 @@ def generate_launch_description():
         DeclareLaunchArgument('map_size_y', default_value='40.0'),
         DeclareLaunchArgument('map_size_z', default_value='5.0'),
         DeclareLaunchArgument('use_gpu', default_value='false'),
+
+        # Start RViz2 with the pre-configured example view (rviz:=false to disable)
+        DeclareLaunchArgument('rviz', default_value='true'),
 
         OpaqueFunction(function=launch_setup),
     ])
