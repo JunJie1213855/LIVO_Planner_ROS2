@@ -47,6 +47,14 @@ def launch_setup(context, *args, **kwargs):
         sensor_pose_topic = '/quad_0/lidar_pose'
 
     cloud_topic = '/LIO/clouds_lidar' if is_real_world else '/pcl_render_node/cloud'
+
+    # Allow overriding LIO topic names (e.g. FAST-LIO2 uses /Odometry + /cloud_registered)
+    lio_odom_ov = LaunchConfiguration('lio_odom_topic').perform(context)
+    lio_cloud_ov = LaunchConfiguration('lio_cloud_topic').perform(context)
+    lio_imu_ov = LaunchConfiguration('lio_imu_topic').perform(context)
+    if lio_odom_ov: body_pose_topic = lio_odom_ov
+    if lio_cloud_ov: cloud_topic = lio_cloud_ov
+    if lio_imu_ov: sensor_pose_topic = lio_imu_ov
     cloud_is_world = (not is_real_world)  # real -> false, sim -> true
     depth_topic = ('/camera/aligned_depth_to_color/image_raw'
                    if is_real_world else '/pcl_render_node/depth')
@@ -144,8 +152,10 @@ def launch_setup(context, *args, **kwargs):
 
     actions = [scan_planner_node]
 
-    # --- controllers (by controller_mode) ---
-    if controller_mode == 'open_loop':
+    # --- controllers (by controller_mode; 'none'/skip/visualization-only) ---
+    if controller_mode in ('none', 'skip', 'viz', 'visualize'):
+        pass  # launch planner only — no velocity commands / kinematic sim
+    elif controller_mode == 'open_loop':
         actions.append(Node(
             package='scan_planner',
             executable='open_loop_controller',
@@ -272,6 +282,12 @@ def generate_launch_description():
 
         # Start RViz2 with the pre-configured example view (rviz:=false to disable)
         DeclareLaunchArgument('rviz', default_value='true'),
+
+        # Override LIO topic names for non-standard LIO outputs
+        # (e.g. FAST-LIO2: lio_odom_topic:=/Odometry lio_cloud_topic:=/cloud_registered)
+        DeclareLaunchArgument('lio_odom_topic', default_value=''),
+        DeclareLaunchArgument('lio_cloud_topic', default_value=''),
+        DeclareLaunchArgument('lio_imu_topic', default_value=''),
 
         OpaqueFunction(function=launch_setup),
     ])
