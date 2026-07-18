@@ -57,7 +57,7 @@ cd ~/rosws/planner_ws && colcon build         # SCAN-Planner
 
 ## 3. 离线回放（推荐）：录制 PCD → 仿真器新地图
 
-### 3.1 启动 FAST-LIO2 在线建图（Livox Mid-360）
+### 3.1 启动 FAST-LIO2 在线建图（Livox Mid-360）(参照你自己的程序，这里只是作为示例)
 
 ```bash
 cd ~/rosws/fast_lio2_ros2
